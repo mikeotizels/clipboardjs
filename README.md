@@ -1,10 +1,12 @@
 Mikeotizels Clipboard JS
 ========================
 
-Version 1.0.0 - December 2024
+Version 2.0.0 - July 2025
 
-Mikeotizels Clipboard JS is a lightweight JavaScript utility for handling copy 
-and cut operations using the asynchronous Clipboard API.
+**Mikeotizels Clipboard** is a lightweight JavaScript utility for handling copy
+and cut operations using the modern asynchronous [Clipboard API][1]. Designed 
+as a drop-in replacement for [Zenorocha's ClipboardJS][2] to addresses browser 
+[compatibility issues][3] caused by the deprecated `execCommand` approach.
 
 It supports:
 
@@ -13,46 +15,42 @@ It supports:
     find another element by its ID;
   - Fallback to the old (synchronous) `document.execCommand` method if the 
     Clipboard API isn't available;
-  - Callback functions for handling the "onSuccess" and "onError" events after 
+  - Callback functions for handling the "success" and "error" events after 
     triggering an action (copy or cut).
 
 ---
 
-### **How to Use**
+## Usage
 
-1. **Include the Script**  
+1. **Load the Script**  
 
 Simply include or bundle the script with your project.
 
+Example:
+
 ```html
-<script src="/path/to/mo.clipboard.min.js"></script>
+<script src="/assets/vendor/mikeotizels/dist/js/mo.clipboard.min.js"></script>
 ```
 
-2. **Markup the HTML** 
+2. **Mark Up Your HTML** 
 
 For an element to work with the plugin, add one or more of the following data
 attributes:
 
-- data-clipboard-action: Specify the action to execute, either "copy" or "cut". 
+- *data-clipboard* (default): Flag to register element with plugin. You can pass
+  any selector you like to the class constructor when initializing the plugin.
+
+- *data-clipboard-action*: Specify the action to execute, either "copy" or "cut". 
   If this attribute is omitted or has an invalid value, copy will be used by 
   default. 
-- data-clipboard-text (optional): Explicit text value to copy or cut. If omitted,
+
+- *data-clipboard-text* (optional): Explicit text value to copy or cut. If omitted,
   the inner text of the trigger element will be used.
-- data-clipboard-target (optional): The ID of another element whose content will 
+
+- *data-clipboard-target* (optional): The ID of another element whose content will 
   be used. 
 
-##### Copy text from explicit attribute
-
-Just include a data-clipboard-text attribute in your trigger element.
-
-```html
-<!-- Copy button that pulls text explicitly -->
-<button class="btn btn-clipboard" aria-label="Copy"
-    data-clipboard-action="copy"
-    data-clipboard-text="Hello, world!">
-    Copy text from attribute
-</button>
-```
+---
 
 ##### Copy text from another element
 
@@ -61,73 +59,98 @@ that by adding a data-clipboard-target attribute in your trigger element. The
 value you include on this attribute needs to match the target element's ID.
   
 ```html 
-<!-- Copy button that uses another element's text -->
-<button class="btn btn-clipboard" aria-label="Copy"
-    data-clipboard-action="copy"
-    data-clipboard-target="copyTarget">
-    Copy text from element
-</button>
-
 <!-- Target element that holds the text -->
-<div id="copyTarget">
+<div id="copy-target">
      Text to be copied...
 </div>
+
+<!-- Copy button that uses another element's text -->
+<button type="button" class="btn btn-clipboard" aria-label="Copy"
+    data-clipboard-action="copy"
+    data-clipboard-target="copy-target">
+    Copy text from element
+</button>
 ```
+
+---
 
 ##### Cut text from another element
 
 Additionally, you can set the data-clipboard-action attribute to "cut" if you 
 want to cut content from an element. If you omit this attribute, copy will be 
-used by default. As you may expect, the cut action only works on `<input>` or 
-`<textarea>` elements.
+used by default.
 
 ```html
 <!-- Target -->
-<textarea id="cutTarget">Text to be cut...</textarea>
+<textarea id="cut-target">Text to be cut...</textarea>
 
 <!-- Trigger -->
-<button class="btn btn-clipboard" aria-label="Cut"
+<button type="button" class="btn btn-clipboard" aria-label="Cut"
     data-clipboard-action="cut"
-    data-clipboard-target="cutTarget">
+    data-clipboard-target="cut-target">
     Cut to clipboard
 </button>
 ```
 
-3. **Set Up the Plugin**  
+As you may expect, the "cut" action only works on `<input>` or `<textarea>` 
+elements.
 
-After the DOM is ready, initialize the plugin and optionally provide callback 
+---
+
+##### Copy text from explicit attribute
+
+Truth is, you don't even need another element to copy its content from. You can 
+just include a data-clipboard-text attribute in your trigger element.
+
+```html
+<!-- Copy button that pulls text explicitly -->
+<button type="button" class="btn btn-clipboard" aria-label="Copy"
+    data-clipboard-action="copy"
+    data-clipboard-text="Hello, world!">
+    Copy text from attribute
+</button>
+```
+
+3. **Set Up the Script**  
+
+After the DOM is ready, initialize the class and optionally provide callback 
 functions:
 
 ```js
 var clipboardSetup = function() {
     // Return early if the moClipboard object is undefined.
     if (typeof moClipboard === 'undefined') {
-        console.error('The Mikeotizels Clipboard JS is not loaded on the page.');
+        console.error('Mikeotizels Clipboard JS is not loaded on the page.');
+        // TODO: Optionally, hide the clipboard trigger elements if the handler 
+        //       script is not available.
         return;
     }
 
     // Instantiate object
-    var clipboard = new moClipboard('.btn-clipboard', {
+    const clipboard = new moClipboard('.btn-clipboard', {
         // Success callback
         // Called on a successful copy or cut; receives an object:
         // `{ action, text, trigger }`
-        onSuccess: (info) => {
-            console.log(`Successfully executed: ${info.action}`);
+        success: (event) => {
+            //console.info(`Successfully executed "${event.action}" action with text: ${event.text}`);
             // TODO: You can add further UI feedback here, like showing a 
             //       tooltip "Copy" or "Cut" on the trigger element.
-            showToast(info.action);
+            showToast(event.action);
         },    
         // Error callback
-        // Called on failure; receives the error object and the trigger element.
-        onError: (error, trigger) => {
+        // Called on failure; receives the Error object and the trigger element.
+        error: (error, trigger) => {
             console.error(`Error during ${trigger.getAttribute("data-clipboard-action")}:`, error);
-            // TODO: Optionally, show a generic error message to the user
+            // TODO: Optionally, show a generic error message to the user or
+            //       show a tooltip "Error" on the trigger element.
         }
     });
 
     // Custom toast notification.
+    // TODO: You can use Bootstrap or SweetAlert2 toast which supports light 
+    //       and dark theme and custom positioning options.
     function showToast(action, timeout = 3000) {
-        const toastDiv = document.createElement('div');
+        const toastDiv  = document.createElement('div');
         let toastText = 'Copied to clipboard';
 
         if (action == 'cut') {
@@ -143,7 +166,72 @@ var clipboardSetup = function() {
     }
 }();
 ``` 
+---
 
-## Inspirations
+## Events
 
-[zenorocha/clipboardjs](https://clipboardjs.com)
+There are cases where you'd like to show some user feedback or capture what has 
+been selected after a copy or cut operation.
+
+That's why custom events are fired, such as success and error for you to listen
+and implement your custom logic.
+
+- **`success`**
+
+    - Called on successful copy/cut operation
+    - Receives the object `{ action, text, trigger }` 
+    - Defaults to `console.log()`
+
+- **`error`**
+    
+    - Called on failed copy/cut operation
+    - Receives the error object `{ name, message }` and the `trigger` element
+    - Defaults to `console.error()`
+
+For a live demo of the default callback functions, just open your console.
+
+---
+
+## Additional Considerations
+
+- **Security & Environment:**
+
+  The new asynchronous Clipboard API requires a [secure context][4]. Ensure your 
+  site is served over HTTPS to utilize these features. Additionally, it requires
+  [transient activation][5], hence, it must be triggered off a UI event like a 
+  button click.
+
+- **UI Feedback:** 
+  
+  Each application has different design needs, that's why Clipboard JS does not 
+  include any CSS or built-in notification solution. You might want to integrate 
+  further visual feedback (like tooltips or toasts) when a copy or cut operation 
+  succeeds or fails. 
+
+- **Customized Data:**   
+
+  If your application needs richer clipboard functionality, you can extend this 
+  plugin to handle different types of data (like HTML or images) using the newer
+  methods such as `navigator.clipboard.write()`, which accepts ClipboardItem 
+  objects.
+ 
+- **Further Enhancements:**  
+
+  If you later decide to add paste functionality or allow dynamic selection of 
+  content (for example, grabbing the current selection), you could add similar
+  methods for reading from the clipboard with `navigator.clipboard.readText()`.
+
+---
+
+## Licensing
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
+for the license terms.
+
+-------------------------------------------------------------------------------
+
+[1]: https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API
+[2]: https://github.com/zenorocha/clipboard.js/issues/880
+[3]: https://developer.mozilla.org/en-US/docs/Web/API/Document/execCommand#browser_compatibility
+[4]: https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts
+[5]: https://developer.mozilla.org/en-US/docs/Glossary/Transient_activation
