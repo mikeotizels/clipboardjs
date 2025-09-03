@@ -131,17 +131,17 @@ var clipboardSetup = function() {
         // Success callback
         // Called on a successful copy or cut; receives an object:
         // `{ action, text, trigger }`
-        success: (event) => {
-            //console.info(`Successfully executed "${event.action}" action with text: ${event.text}`);
+        onSuccess: (event) => {
+            console.info('[moClipboard] Clipboard operation executed.', { action, text, trigger }); 
             // TODO: You can add further UI feedback here, like showing a 
             //       tooltip "Copy" or "Cut" on the trigger element.
             showToast(event.action);
         },    
         // Error callback
         // Called on failure; receives the Error object and the trigger element.
-        error: (error, trigger) => {
-            console.error(`Error during ${trigger.getAttribute("data-clipboard-action")}:`, error);
-            // TODO: Optionally, show a generic error message to the user or
+        onError: (error, trigger) => {
+             console.error('[moClipboard] Clipboard operation failed.', error, { trigger: trigger });
+            // TODO: Optionally show a generic error message to the user or
             //       show a tooltip "Error" on the trigger element.
         }
     });
@@ -176,19 +176,15 @@ been selected after a copy or cut operation.
 That's why custom events are fired, such as success and error for you to listen
 and implement your custom logic.
 
-- **`success`**
+- **`onSuccess`**
 
     - Called on successful copy/cut operation
-    - Receives the object `{ action, text, trigger }` 
-    - Defaults to `console.log()`
+    - Receives the object `{ action, text, trigger }`
 
-- **`error`**
+- **`onError`**
     
     - Called on failed copy/cut operation
     - Receives the error object `{ name, message }` and the `trigger` element
-    - Defaults to `console.error()`
-
-For a live demo of the default callback functions, just open your console.
 
 ---
 
