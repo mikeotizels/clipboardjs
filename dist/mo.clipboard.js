@@ -3,7 +3,6 @@
  * 
  * https://github.com/mikeotizels/clipboardjs
  * 
- * @category  Web API
  * @package   Mikeotizels/Web/Toolkit
  * @author    Michael Otieno <mikeotizels@gmail.com>
  * @copyright Copyright 2024-2025 Michael Otieno. All Rights Reserved.
@@ -12,7 +11,7 @@
  * @version   2.0.0
  */
 
-;(() => {
+(() => {
     "use strict";
 
     /**
@@ -22,25 +21,23 @@
      *
      * @class
      */
-    class moClipboard {
+    window.moClipboard = class {
         /**
          * Constructor.
          * 
          * @since 1.0.0
          *
-         * @param {string}   selector          - A CSS selector string for trigger elements.
-         *                                       Defaults to '[data-clipboard]' if not provided.
-         *                                       These elements should have either:
-         *                                       - `data-clipboard-action` set to either "copy" or "cut"
-         *                                       - `data-clipboard-text`   attribute for direct text
-         *                                       - `data-clipboard-target` pointing to an element ID
-         * @param {Object}   [options={}]      - Configuration options.
-         * @param {Function} [options.success] - Callback function invoked on successful copy/cut.
-         *                                       Receives the object `{ action, text, trigger }`.
-         *                                       Defaults to `console.info()`
-         * @param {Function} [options.error]   - Callback function invoked on copy/cut failure.
-         *                                       Receives the error object `{ name, message }` and the `trigger` element. 
-         *                                       Defaults to `console.error()`.
+         * @param {string}   selector            - A CSS selector string for trigger elements.
+         *                                         Defaults to '[data-clipboard]' if not provided.
+         *                                         These elements should have either:
+         *                                         - `data-clipboard-action` set to either "copy" or "cut"
+         *                                         - `data-clipboard-text`   attribute for direct text
+         *                                         - `data-clipboard-target` pointing to an element ID
+         * @param {Object}   [options={}]        - Configuration options.
+         * @param {Function} [options.onSuccess] - Callback function invoked on successful copy/cut.
+         *                                         Receives the object `{ action, text, trigger }`.
+         * @param {Function} [options.onError]   - Callback function invoked on copy/cut failure.
+         *                                         Receives the error object `{ name, message }` and the `trigger` element.
          */
         constructor(selector, options = {}) {
             // Selector for trigger elements
@@ -50,14 +47,14 @@
             this.options = options;
 
             // Callback function for success event
-            this.success = typeof this.options.success === "function"
-                ? this.options.success
-                : (data, trigger) => console.info("[moClipboard] Clipboard operation executed.", { action, text, trigger });
+            this.onSuccess = typeof this.options.onSuccess === "function"
+                ? this.options.onSuccess
+                : () => {};
             
             // Callback function for error event
-            this.error = typeof this.options.error === "function"
-                ? this.options.error
-                : (error, trigger) => console.error("[moClipboard] Clipboard operation failed.", error, { trigger: trigger });
+            this.onError = typeof this.options.onError === "function"
+                ? this.options.onError
+                : () => {};
             
             // Initialize the plugin
             this._init();
@@ -149,9 +146,9 @@
                             await this._copy(text);
                             this._removeText(targetEl);
                         }
-                        this.success({ action: action, text: text, trigger: trigger });
+                        this.onSuccess({ action: action, text: text, trigger: trigger });
                     } catch (error) {
-                        this.error(error, trigger);
+                        this.onError(error, trigger);
                     }                    
                 });
             });
@@ -259,7 +256,4 @@
             }
         }
     }
-
-    // Expose the moClipboard class globally.
-    window.moClipboard = moClipboard;
 })();
