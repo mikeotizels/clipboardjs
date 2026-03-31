@@ -1,7 +1,7 @@
 Mikeotizels Clipboard JS
 ========================
 
-Version 2.0.0 - July 2025
+Version 2.1.0 - March 2026
 
 **Mikeotizels Clipboard** is a lightweight JavaScript utility for handling copy
 and cut operations using the modern asynchronous [Clipboard API][1]. Designed 
@@ -176,12 +176,12 @@ been selected after a copy or cut operation.
 That's why custom events are fired, such as success and error for you to listen
 and implement your custom logic.
 
-- **`onSuccess`**
+- **`onSuccess`** or `.on('success', callback)`
 
     - Called on successful copy/cut operation
     - Receives the object `{ action, text, trigger }`
 
-- **`onError`**
+- **`onError`** or `.on('error', callback)`
     
     - Called on failed copy/cut operation
     - Receives the error object `{ name, message }` and the `trigger` element
