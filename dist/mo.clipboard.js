@@ -1,17 +1,16 @@
 /*!
  * Mikeotizels Clipboard JS
- * 
+ *
  * https://github.com/mikeotizels/clipboardjs
- * 
+ *
  * @package   Mikeotizels/Web/Toolkit
  * @author    Michael Otieno <mikeotizels@gmail.com>
- * @copyright Copyright 2024-2025 Michael Otieno. All Rights Reserved.
+ * @copyright Copyright 2024-2026 Michael Otieno. All Rights Reserved.
  * @license   The MIT License (http://opensource.org/licenses/MIT)
- * @since     2.0.0
- * @version   2.0.0
+ * @version   2.1.0
  */
 
-(() => {
+;(() => {
     "use strict";
 
     /**
@@ -23,11 +22,12 @@
      */
     window.moClipboard = class {
         /**
-         * Constructor.
+         * Constructor
          * 
          * @since 1.0.0
+         * @since 2.1.0 Added support for internal event listeners.
          *
-         * @param {string}   selector            - A CSS selector string for trigger elements.
+         * @param {string}   selector            - A DOM selector string for trigger elements.
          *                                         Defaults to '[data-clipboard]' if not provided.
          *                                         These elements should have either:
          *                                         - `data-clipboard-action` set to either "copy" or "cut"
@@ -39,25 +39,104 @@
          * @param {Function} [options.onError]   - Callback function invoked on copy/cut failure.
          *                                         Receives the error object `{ name, message }` and the `trigger` element.
          */
-        constructor(selector, options = {}) {
-            // Selector for trigger elements
-            this.selector = selector || "[data-clipboard]";
+        constructor(selector = "[data-clipboard]", options = {}) {
+            this.selector = selector;
 
-            // Options for callback events
-            this.options = options;
+            // @since 2.1.0 Internal event listener registry
+            this._listeners = new Map();
 
-            // Callback function for success event
-            this.onSuccess = typeof this.options.onSuccess === "function"
-                ? this.options.onSuccess
-                : () => {};
-            
-            // Callback function for error event
-            this.onError = typeof this.options.onError === "function"
-                ? this.options.onError
-                : () => {};
-            
-            // Initialize the plugin
-            this._init();
+            // Backward compatibility: support constructor callbacks
+            if (typeof options.onSuccess === "function") {
+                this.on("success", options.onSuccess);
+            }
+            if (typeof options.onError === "function") {
+                this.on("error", options.onError);
+            }
+
+            // @since 2.1.0 Only initialize delegation once
+            if (!window.moClipboard._isInitialized) {
+                this._init();
+                window.moClipboard._isInitialized = true;
+            }
+        }
+
+        /**
+         * Registers a callback for an event ('success' or 'error').
+         * 
+         * @since 2.1.0
+         * 
+         * @param {string}   eventName - 'success' or 'error'
+         * @param {Function} callback  - function to call when event fires
+         * 
+         * @returns {this} for chaining
+         */
+        on(eventName, callback) {
+            if (typeof callback !== "function") return this;
+
+            const normalized = eventName.toLowerCase();
+
+            if (!["success", "error"].includes(normalized)) {
+                console.warn(`[moClipboard] Unsupported event: "${eventName}"`);
+                return this;
+            }
+
+            if (!this._listeners.has(normalized)) {
+                this._listeners.set(normalized, new Set());
+            }
+
+            this._listeners.get(normalized).add(callback);
+
+            return this;
+        }
+
+        /**
+         * Removes a callback (or all callbacks) for an event.
+         * 
+         * @since 2.1.0
+         * 
+         * @param {string}   eventName  - 'success' or 'error'
+         * @param {Function} [callback] - specific callback to remove (optional)
+         * 
+         * @returns {this} for chaining
+         */
+        off(eventName, callback) {
+            const normalized = eventName.toLowerCase();
+
+            if (!this._listeners.has(normalized)) return this;
+
+            if (typeof callback === "function") {
+                this._listeners.get(normalized).delete(callback);
+                if (this._listeners.get(normalized).size === 0) {
+                    this._listeners.delete(normalized);
+                }
+            } else {
+                // Remove all listeners for this event
+                this._listeners.delete(normalized);
+            }
+
+            return this;
+        }
+
+        /**
+         * Triggers listeners for an event.
+         * 
+         * @since 2.1.0
+         * 
+         * @internal
+         */
+        _emit(eventName, ...args) {
+            const normalized = eventName.toLowerCase();
+
+            if (!this._listeners.has(normalized)) return;
+
+            // Copy set to avoid mutation-during-iteration issues
+            for (const cb of [...this._listeners.get(normalized)]) {
+                try {
+                    cb(...args);
+                } catch (error) {
+                    console.error(`[moClipboard] Error in ${eventName} callback:`, error);
+                }
+            }
         }
 
         /**
@@ -69,14 +148,6 @@
          * @private
          */
         _init() {
-            // Select all elements that should trigger the Clipboard API.
-            const triggers = document.querySelectorAll(this.selector);
-
-            // Return early if no trigger element is found in the current DOM.
-            if (!triggers.length) {
-                return;
-            }
-
             /**
              * Add click event listeners to all trigger elements.
              * 
@@ -85,73 +156,73 @@
              * 
              * @see https://developer.mozilla.org/en-US/docs/Glossary/Transient_activation
              * 
-             * @todo Try attaching a single delegated event listener to document 
-             *       instead of binding to each button.
+             * @since 2.1.0 Attaches a single delegated event listener to document 
+             *              instead of binding to each button.
              */
-            triggers.forEach((trigger) => {
-                // Arrow function keeps `this` bound to the instance.
-                trigger.addEventListener("click", async (event) => {
-                    // Prevent the default behavior of the element.
-                    event.preventDefault();
+            document.addEventListener("click", async (event) => {
+                // Only continue if the clicked element matches our selector
+                const trigger = event.target.closest(this.selector);
+                if (!trigger) return;
 
-                    // Determine the action to execute.
-                    let action = trigger.getAttribute("data-clipboard-action");
-                    if (!action || (action !== "copy" && action !== "cut")) {
-                        // Default to copy if data-clipboard-action attribute 
-                        // is missing or has an invalid value.
-                        console.warn('[moClipboard] Missing or invalid "action" attribute, defaulting to "copy".');
-                        action = "copy";
+                // Prevent the default behavior of the element.
+                event.preventDefault();
+
+                // Determine the action to execute.
+                let action = trigger.getAttribute("data-clipboard-action") || "copy";
+                if (action !== "copy" && action !== "cut") {
+                    console.warn('[moClipboard] Invalid "action" attribute, defaulting to "copy".');
+                    action = "copy";
+                }
+
+                // Determine the text to use.
+                let text, targetEl;
+                if (trigger.hasAttribute("data-clipboard-text")) {
+                    // Use explicit text if provided.
+                    text = trigger.getAttribute("data-clipboard-text");
+                } else if (trigger.hasAttribute("data-clipboard-target")) {
+                    // Use the text from another element referenced by its ID.
+                    const targetId = trigger.getAttribute("data-clipboard-target");
+                    targetEl = document.getElementById(targetId);
+
+                    if (!targetEl) {
+                        console.error(`[moClipboard] Target element not found: #${targetId}`);
+                        this._emit("error", new Error("Target not found"), trigger);
+                        return;
                     }
 
-                    // Determine the text to use.
-                    let text, targetEl;
-                    if (trigger.hasAttribute("data-clipboard-text")) {
-                        // Use explicit text if provided.
-                        text = trigger.getAttribute("data-clipboard-text");
-                    } else if (trigger.hasAttribute("data-clipboard-target")) {
-                        // Use the text from another element referenced by its ID.
-                        const targetId = trigger.getAttribute("data-clipboard-target");
-                              targetEl = document.getElementById(targetId);
-
-                        if (targetEl) {
-                            if (action === "copy" && targetEl.hasAttribute("disabled")) {
-                                console.error(
-                                    '[moClipboard] Invalid "target" attribute. Please use "readonly" instead of "disabled" attribute.'
-                                );
-                                return;
-                            }
-
-                            if (action === "cut" && (targetEl.hasAttribute("readonly") || targetEl.hasAttribute("disabled"))) {
-                                console.error(
-                                    '[moClipboard] Invalid "target" attribute. You can\'t cut text from elements with "readonly" or "disabled" attributes.'
-                                );
-                                return;
-                            }
-
-                            text = this._getText(targetEl);
-                        } else {
-                            console.error(`[moClipboard] Unable to find the "target" element with ID "${targetId}"`);
-                            return;
-                        }
-                    } else {
-                        // Fallback: Use text from the triggering element itself.
-                        text = this._getText(trigger);
+                    if (action === "copy" && targetEl.hasAttribute("disabled")) {
+                        console.error('[moClipboard] Use "readonly" instead of "disabled" for copy targets.');
+                        this._emit("error", new Error("Disabled target invalid for copy"), trigger);
+                        return;
                     }
 
-                    try {
-                        // Execute the desired action.
-                        if (action === "copy") {
-                            await this._copy(text);
-                        } else if (action === "cut") {
-                            await this._copy(text);
-                            this._removeText(targetEl);
-                        }
-                        this.onSuccess({ action: action, text: text, trigger: trigger });
-                    } catch (error) {
-                        this.onError(error, trigger);
-                    }                    
-                });
-            });
+                    if (action === "cut" && (targetEl.hasAttribute("readonly") || targetEl.hasAttribute("disabled"))) {
+                        console.error('[moClipboard] Cannot cut from readonly or disabled elements.');
+                        this._emit("error", new Error("Readonly/disabled target invalid for cut"), trigger);
+                        return;
+                    }
+
+                    text = this._getText(targetEl);
+                } else {
+                    // Fallback: Use text from the triggering element itself.
+                    text = this._getText(trigger);
+                }
+
+                try {
+                    // Execute the desired action.
+                    if (action === "copy") {
+                        await this._copy(text);
+                    } else if (action === "cut") {
+                        await this._copy(text);
+                        this._removeText(targetEl);
+                    }
+
+                    this._emit("success", { action, text, trigger });
+                } catch (error) {
+                    console.error('[moClipboard] Operation failed:', error);
+                    this._emit("error", error, trigger);
+                }
+            }, { passive: false });
         }
 
         /**
@@ -172,8 +243,7 @@
             if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
                 return element.value;
             }
-
-            return element.innerText;
+            return element.innerText || element.textContent || "";
         }
 
         /**
@@ -212,11 +282,10 @@
          * @private
          */
         _copy(text) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
+            if (navigator.clipboard?.writeText) {
                 return navigator.clipboard.writeText(text);
-            } else {
-                return this._fallbackCopy(text);
-            } 
+            }
+            return this._fallbackCopy(text);
         }
 
         /**
@@ -237,23 +306,21 @@
             const textarea = document.createElement("textarea");
 
             // Position the textarea off-screen to avoid UI disruption.
-            textarea.style.position = "fixed";
-            textarea.style.top      = "0";
-            textarea.style.left     = "0";
-            textarea.style.opacity  = "0";
-            textarea.value          = text;
-            textarea.setAttribute("readonly", "readonly");
+            textarea.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
             document.body.appendChild(textarea);
             textarea.focus();
             textarea.select();
 
             try {
-                document.execCommand("copy");
+                const success = document.execCommand("copy");
+                if (!success) throw new Error("execCommand('copy') failed");
             } catch (error) {
                 throw error;
             } finally {
                 document.body.removeChild(textarea);
             }
         }
-    }
+    };
 })();
